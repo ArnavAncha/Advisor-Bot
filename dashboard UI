@@ -1,0 +1,639 @@
+import React, { useEffect, useState } from 'react';
+import { Search, Sparkles, TrendingUp, ShieldCheck, Bot } from 'lucide-react';
+
+// The main App component that acts as the dashboard
+const App = () => {
+  const [symbol, setSymbol] = useState('NYSE:JPM');
+  const [riskProfile, setRiskProfile] = useState('Balanced');
+  const [advisorNote, setAdvisorNote] = useState('Balanced portfolios remain attractive with selective exposure to financials and mega-cap technology.');
+
+  const profileAdvice = {
+    Conservative: 'A defensive posture is best right now; prioritize quality dividend names and cash buffers.',
+    Balanced: 'Balanced portfolios remain attractive with selective exposure to financials and mega-cap technology.',
+    Growth: 'Momentum remains strong in innovation and AI-led sectors, but maintain strict stop-loss discipline.'
+  };
+
+  const handleSymbolChange = (event) => {
+    setSymbol(event.target.value);
+  };
+
+  const handleRiskChange = (event) => {
+    const nextProfile = event.target.value;
+    setRiskProfile(nextProfile);
+    setAdvisorNote(profileAdvice[nextProfile]);
+  };
+
+  return (
+    // This style block contains the CSS you provided, making sure the component
+    // is styled correctly.
+    <>
+      <style>
+        {`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        
+        body {
+          font-family: 'Inter', sans-serif;
+          background-color: #0f172a;
+          color: #f1f5f9;
+        }
+
+        .dashboard-content {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+          max-width: 1280px;
+          margin: 0 auto;
+          padding: 32px;
+        }
+        
+        .dashboard-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 24px 16px;
+          margin-bottom: 24px;
+          border-bottom: 2px solid #334155;
+          gap: 16px;
+        }
+
+        .dashboard-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 0.8rem;
+          text-transform: uppercase;
+          letter-spacing: 0.2em;
+          color: #818cf8;
+          margin-bottom: 8px;
+        }
+
+        .dashboard-subtitle {
+          color: #94a3b8;
+          margin-top: 6px;
+          max-width: 640px;
+        }
+        
+        @media (max-width: 640px) {
+          .dashboard-header {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+        }
+
+        .advisor-hero-card {
+          display: grid;
+          grid-template-columns: 1.4fr 0.9fr;
+          gap: 20px;
+          background: linear-gradient(135deg, rgba(79,70,229,0.35), rgba(15,23,42,0.95));
+          padding: 24px;
+          border-radius: 24px;
+          border: 1px solid #4338ca;
+          margin-bottom: 24px;
+        }
+
+        .assistant-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          width: fit-content;
+          padding: 6px 10px;
+          border-radius: 999px;
+          background: rgba(129,140,248,0.2);
+          color: #c7d2fe;
+          font-size: 0.8rem;
+          margin-bottom: 12px;
+        }
+
+        .advisor-hero-card h3 {
+          font-size: 1.5rem;
+          margin-bottom: 8px;
+          color: #f8fafc;
+        }
+
+        .advisor-hero-card p {
+          color: #cbd5e1;
+          line-height: 1.6;
+        }
+
+        .advisor-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-top: 16px;
+        }
+
+        .advisor-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 12px;
+          border-radius: 999px;
+          background: rgba(15,23,42,0.55);
+          color: #e2e8f0;
+          font-size: 0.9rem;
+        }
+
+        .advisor-hero-panel {
+          background: rgba(15,23,42,0.75);
+          border: 1px solid #334155;
+          border-radius: 18px;
+          padding: 18px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .advisor-label {
+          font-size: 0.85rem;
+          color: #cbd5e1;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+        }
+
+        .advisor-hero-panel select,
+        .symbol-picker select {
+          width: 100%;
+          border: 1px solid #475569;
+          background: #0f172a;
+          color: #f8fafc;
+          padding: 10px 12px;
+          border-radius: 10px;
+        }
+
+        .advisor-response {
+          color: #f8fafc;
+          padding: 10px 12px;
+          border-radius: 12px;
+          background: rgba(45,212,191,0.12);
+          border: 1px solid rgba(45,212,191,0.25);
+        }
+
+        .advisor-recommendations {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+          padding: 10px 12px;
+          border-radius: 12px;
+          background: rgba(129,140,248,0.14);
+          color: #e2e8f0;
+        }
+
+        .symbol-picker {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 10px;
+          flex-wrap: wrap;
+        }
+
+        .symbol-picker label {
+          color: #cbd5e1;
+          font-size: 0.95rem;
+        }
+        
+        .kpi-cards {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 24px;
+          margin-bottom: 32px;
+        }
+        
+        .kpi-cards .card {
+          text-align: left;
+          background-color: #1e293b;
+          padding: 24px;
+          border-radius: 24px;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+          border: 1px solid #334155;
+        }
+        
+        .kpi-cards .card h3 {
+          font-size: 1.25em;
+          color: #cbd5e1;
+          margin-bottom: 8px;
+        }
+        
+        .kpi-cards .card .value {
+          font-size: 2em;
+          font-weight: bold;
+          color: #f1f5f9;
+          margin-bottom: 5px;
+        }
+        
+        .kpi-cards .card .updated {
+          font-size: 0.875em;
+          color: #94a3b8;
+        }
+
+        .performance-comparison {
+          background-color: #1e293b;
+          padding: 24px;
+          border-radius: 24px;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+          border: 1px solid #334155;
+          margin-bottom: 32px;
+        }
+
+        .performance-comparison .chart-controls {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          margin-top: 16px;
+        }
+
+        @media (min-width: 640px) {
+          .performance-comparison .chart-controls {
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+          }
+        }
+
+        .performance-comparison .chart-legend {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 16px;
+          font-size: 0.875em;
+          color: #cbd5e1;
+          margin-bottom: 16px;
+        }
+
+        @media (min-width: 640px) {
+          .performance-comparison .chart-legend {
+            margin-bottom: 0;
+          }
+        }
+
+        .performance-comparison .chart-legend span {
+          display: flex;
+          align-items: center;
+        }
+
+        .performance-comparison .chart-legend span::before {
+          content: '';
+          width: 12px;
+          height: 12px;
+          border-radius: 9999px; /* rounded-full */
+          margin-right: 8px;
+        }
+
+        .performance-comparison .chart-legend .ai-strategy::before { background-color: #2dd4bf; }
+        .performance-comparison .chart-legend .buy-and-hold::before { background-color: #6366f1; }
+        .performance-comparison .chart-legend .buy-signal::before { background-color: #22c55e; }
+        .performance-comparison .chart-legend .sell-signal::before { background-color: #ef4444; }
+
+        .dashboard-bottom-section {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 24px;
+        }
+
+        @media (min-width: 1024px) {
+          .dashboard-bottom-section {
+            grid-template-columns: 1fr 2fr;
+          }
+        }
+        
+        .model-insights {
+          background-color: #1e293b;
+          padding: 24px;
+          border-radius: 24px;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+          border: 1px solid #334155;
+          overflow: hidden;
+        }
+
+        .model-insights h3, .trades-log h3 {
+          font-size: 1.5em;
+          font-weight: 600;
+          margin-bottom: 16px;
+          color: #a5b4fc;
+        }
+
+        .model-insights ul {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+        }
+
+        .model-insights ul li {
+          display: flex;
+          justify-content: space-between;
+          padding: 8px 0;
+          border-bottom: 1px solid #334155;
+          color: #cbd5e1;
+        }
+
+        .model-insights ul li:last-child {
+          border-bottom: none;
+        }
+
+        .model-insights .latest-prediction {
+          background-color: #0f172a;
+          padding: 16px;
+          border-radius: 12px;
+          border: 1px solid #334155;
+          margin-top: 24px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+        
+        @media (min-width: 768px) {
+          .model-insights .latest-prediction {
+            margin-top: 0;
+          }
+        }
+        
+        .model-insights .latest-prediction h4 {
+          font-size: 1.25em;
+          font-weight: 500;
+          color: #a5b4fc;
+          margin-bottom: 8px;
+        }
+        
+        .model-insights .latest-prediction .prediction-buy {
+          font-size: 1.875em;
+          font-weight: bold;
+          color: #22c55e;
+          margin-bottom: 4px;
+        }
+
+        .model-insights .latest-prediction .prediction-confidence {
+          font-size: 1.125em;
+          color: #cbd5e1;
+        }
+
+        .model-insights .latest-prediction .prediction-note {
+          font-size: 0.875em;
+          color: #64748b;
+          margin-top: 8px;
+        }
+        
+        .trades-log {
+          background-color: #1e293b;
+          padding: 24px;
+          border-radius: 24px;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+          border: 1px solid #334155;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .trades-log table {
+          min-width: 100%;
+          text-align: left;
+          font-size: 0.875em;
+          color: #cbd5e1;
+        }
+        
+        .trades-log thead {
+          background-color: #334155;
+          color: #e2e8f0;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .trades-log th, .trades-log td {
+          padding: 12px 16px;
+          border-bottom: 1px solid #334155;
+        }
+        
+        .trades-log tbody tr:hover {
+          background-color: #1f2a3c;
+        }
+        
+        .trades-log .action-buy {
+          padding: 4px 8px;
+          border-radius: 9999px;
+          color: #166534;
+          background-color: #dcfce7;
+        }
+        
+        .view-all-trades-btn {
+          margin-top: 24px;
+          width: 100%;
+          padding: 8px 16px;
+          border-radius: 9999px;
+          background-color: #4f46e5;
+          color: #ffffff;
+          font-weight: 500;
+          transition: background-color 0.2s ease-in-out;
+          border: none;
+        }
+        
+        .view-all-trades-btn:hover {
+          background-color: #4338ca;
+        }
+        
+        .footer {
+          margin-top: 40px;
+          text-align: center;
+          color: #64748b;
+          font-size: 0.875em;
+        }
+
+        `}
+      </style>
+      <div className="dashboard-content">
+        <header className="dashboard-header">
+          <div>
+            <div className="dashboard-tag"><Bot size={14} /> JPMC Internship 2025</div>
+            <h1 className="text-4xl font-bold mb-2 sm:mb-0 text-indigo-400">Advisor Bot Dashboard</h1>
+            <p className="dashboard-subtitle">A polished demo of an intelligent financial advisory experience for portfolio monitoring, model insights, and action planning.</p>
+          </div>
+          <div className="search-bar relative">
+            <input
+              type="text"
+              placeholder="Search..."
+              className="pl-10 pr-4 py-2 rounded-full bg-slate-800 text-gray-200 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          </div>
+        </header>
+
+        <section className="advisor-hero-card">
+          <div className="advisor-hero-copy">
+            <div className="assistant-badge"><Sparkles size={14} /> AI Advisor</div>
+            <h3>Personalized guidance for the next market move</h3>
+            <p>Adjust the risk profile to see how the assistant changes its recommendation style and portfolio posture.</p>
+            <div className="advisor-actions">
+              <div className="advisor-pill"><TrendingUp size={14} /> Momentum positive</div>
+              <div className="advisor-pill"><ShieldCheck size={14} /> Risk posture steady</div>
+            </div>
+          </div>
+          <div className="advisor-hero-panel">
+            <label className="advisor-label" htmlFor="risk-profile">Risk profile</label>
+            <select id="risk-profile" value={riskProfile} onChange={handleRiskChange}>
+              <option value="Conservative">Conservative</option>
+              <option value="Balanced">Balanced</option>
+              <option value="Growth">Growth</option>
+            </select>
+            <p className="advisor-response">{advisorNote}</p>
+            <div className="advisor-recommendations">
+              <span>Suggested action</span>
+              <strong>Rebalance with a 5% cash buffer</strong>
+            </div>
+          </div>
+        </section>
+
+        {/* Key Performance Indicator (KPI) Cards Section */}
+        <section className="kpi-cards">
+          <Card title="AI Portfolio Value" value="$842,150" change="+5.8%" />
+          <Card title="Buy-and-Hold" value="+$128.4K" change="+11.2%" />
+          <Card title="ROI vs Market" value="+4.8%" change="vs S&P" />
+          <Card title="Model Accuracy" value="87%" updated="LSTM" />
+        </section>
+
+        {/* Performance Comparison Section with the Stock Widget */}
+        <section className="performance-comparison">
+          <div className="symbol-picker">
+            <label htmlFor="stock-symbol">Asset view</label>
+            <select id="stock-symbol" value={symbol} onChange={handleSymbolChange}>
+              <option value="NYSE:JPM">JPMorgan Chase</option>
+              <option value="NASDAQ:MSFT">Microsoft</option>
+              <option value="NASDAQ:NVDA">NVIDIA</option>
+              <option value="NASDAQ:AAPL">Apple</option>
+            </select>
+          </div>
+          <h3 className="text-2xl font-semibold mb-2 text-indigo-300">The Current Stock Market</h3>
+          <div className="mt-6 w-full h-[400px] flex justify-center items-center rounded-2xl overflow-hidden">
+            <StockWidget symbol={symbol} />
+          </div>
+        </section>
+
+        {/* Model Insights and Trades Log Sections */}
+        <section className="dashboard-bottom-section">
+          <div className="model-insights">
+            <h3>Model Insights</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <ul>
+                  <li>Feature importance <span className="text-gray-400">32%</span></li>
+                  <li>RSI (14-day) <span className="text-gray-400">28%</span></li>
+                  <li>MACD Signal <span className="text-gray-400">20%</span></li>
+                  <li>Bollinger Bands <span className="text-gray-400">15%</span></li>
+                  <li>Volume Change <span className="text-gray-400">12%</span></li>
+                  <li>Price Momentum <span className="text-gray-400">10%</span></li>
+                </ul>
+              </div>
+              <div className="latest-prediction">
+                <div>
+                  <h4>Latest Prediction</h4>
+                  <p className="prediction-buy">BUY</p>
+                  <p className="prediction-confidence">Confidence: 87%</p>
+                </div>
+                <p className="prediction-note">Based on uptrend bond and RSI indicators</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="trades-log">
+            <h3>Trades Log</h3>
+            <div className="overflow-x-auto rounded-lg">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Action</th>
+                    <th>Shares</th>
+                    <th>Price ($)</th>
+                    <th>Portfolio ($)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>2025-06-28</td>
+                    <td><span className="action-buy">BUY</span></td>
+                    <td>52</td>
+                    <td>214.30</td>
+                    <td>11,142.00</td>
+                  </tr>
+                  <tr>
+                    <td>2025-06-22</td>
+                    <td><span className="action-buy">BUY</span></td>
+                    <td>34</td>
+                    <td>198.10</td>
+                    <td>6,735.40</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <button className="view-all-trades-btn">
+              View all trades (Coming Soon!)
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <footer className="footer">
+        <p>&copy; 2025 AI Stock Dashboard. All rights reserved.</p>
+        <p>Data provided by TradingView.</p>
+      </footer>
+    </>
+  );
+};
+
+// Reusable Card component for KPIs
+const Card = ({ title, value, change, updated, changeColor = 'text-green-500' }) => (
+  <div className="card">
+    <h3 className="text-xl font-medium text-gray-300">{title}</h3>
+    <p className="text-3xl font-bold mt-2">
+      <span className="value">{value}</span>
+      {change && <span className={`text-xl font-medium ml-2 ${changeColor}`}>{change}</span>}
+    </p>
+    {updated && <span className="updated">Updated via {updated}</span>}
+  </div>
+);
+
+// The component responsible for rendering the TradingView widget
+const StockWidget = ({ symbol }) => {
+  const widgetId = 'tradingview-chart-container';
+
+  useEffect(() => {
+    // Check if the script has already been loaded to prevent duplicates
+    if (document.getElementById(widgetId).querySelector('script')) {
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+    script.async = true;
+
+    // The configuration for the widget is passed as an object
+    script.innerHTML = JSON.stringify({
+      "symbol": symbol,
+      "interval": "D",
+      "timezone": "Etc/UTC",
+      "theme": "dark",
+      "style": "2",
+      "locale": "en",
+      "withdateranges": true,
+      "allow_symbol_change": true,
+      "container_id": widgetId,
+    });
+
+    const container = document.getElementById(widgetId);
+    if (container) {
+      container.appendChild(script);
+    }
+
+    // Cleanup function to remove the widget when the component unmounts
+    return () => {
+      const existingScript = container?.querySelector('script');
+      if (existingScript) {
+        container.removeChild(existingScript);
+      }
+    };
+  }, [symbol]); // The effect re-runs if the 'symbol' prop changes
+
+  return (
+    <div id={widgetId} className="w-full h-full">
+      <div className="tradingview-widget-container__widget"></div>
+    </div>
+  );
+};
+        
+export default App;
