@@ -1,6 +1,4 @@
-streamlit
-plotly
-tiingo
-pandas
-openai
-
+streamlit>=1.30.0
+pandas>=2.0.0
+yfinance>=0.2.30
+plotly>=5.15.0
