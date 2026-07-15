@@ -98,6 +98,14 @@ QUESTIONNAIRE: List[Dict[str, Any]] = [
 
 _HISTORY_CACHE: Dict[str, Tuple[datetime, pd.DataFrame, str]] = {}
 _CACHE_TTL = timedelta(minutes=10)
+TRANSACTION_COST_RATE = 0.001
+SLIPPAGE_RATE = 0.0005
+MIN_TRADE_SPACING_DAYS = 7
+TARGET_EXPOSURE_BY_SIGNAL = {
+    "BUY": 1.0,
+    "HOLD": 0.9,
+    "SELL": 0.7,
+}
 
 
 class AdvisorRequest(BaseModel):
@@ -295,7 +303,56 @@ def risk_profile_from_answers(answers: Dict[str, str]) -> Dict[str, Any]:
     return {"riskProfile": profile, "riskScore": risk_score, "answers": normalized_answers}
 
 
-def recommendation(profile: str, prediction: str, confidence: int, metrics: Dict[str, float]) -> Dict[str, Any]:
+def evidence_adjusted_confidence(model_score: float, accuracy: float, relative_return: float) -> int:
+    raw_confidence = 56 + abs(model_score) * 11
+    confidence = int(max(52, min(94, raw_confidence)))
+
+    if accuracy < 50:
+        confidence -= 14
+    elif accuracy < 55:
+        confidence -= 10
+    elif accuracy >= 62:
+        confidence += 4
+
+    if relative_return < -20:
+        confidence -= 12
+    elif relative_return < -10:
+        confidence -= 8
+    elif relative_return < 0:
+        confidence -= 4
+    elif relative_return >= 10:
+        confidence += 4
+
+    if accuracy < 50:
+        confidence = min(confidence, 68)
+    elif accuracy < 55:
+        confidence = min(confidence, 74)
+
+    if relative_return < -10:
+        confidence = min(confidence, 68)
+
+    return int(max(52, min(94, confidence)))
+
+
+def trade_price(row: pd.Series, action: str) -> float:
+    close_price = safe_float(row.get("Close"))
+    open_price = safe_float(row.get("Open"), close_price)
+    price = open_price if open_price > 0 else close_price
+    if action == "BUY":
+        return price * (1 + SLIPPAGE_RATE)
+    if action == "SELL":
+        return price * (1 - SLIPPAGE_RATE)
+    return price
+
+
+def recommendation(
+    profile: str,
+    prediction: str,
+    confidence: int,
+    metrics: Dict[str, float],
+    accuracy: float,
+    relative_return: float,
+) -> Dict[str, Any]:
     rsi_value = metrics["rsi"]
     volatility = metrics["volatility30"]
     momentum = metrics["momentum20"]
@@ -325,7 +382,8 @@ def recommendation(profile: str, prediction: str, confidence: int, metrics: Dict
     note = (
         f"{base}: RSI is {rsi_value:.1f}, 20-day momentum is {momentum:.1f}%, "
         f"and 30-day annualized volatility is {volatility:.1f}%. "
-        f"For a {profile.lower()} profile, the model confidence is {confidence}%."
+        f"For a {profile.lower()} profile, confidence is {confidence}% after accounting for "
+        f"a {accuracy:.0f}% signal hit rate and a {relative_return:.1f}% strategy spread versus buy-and-hold."
     )
 
     return {
@@ -340,26 +398,42 @@ def simulate_strategy(data: pd.DataFrame) -> Dict[str, Any]:
     cash = initial_cash
     shares = 0
     trades: List[Dict[str, Any]] = []
-    last_trade_index = -10
+    last_trade_index = -MIN_TRADE_SPACING_DAYS
+    start_index = 51 if len(data) > 51 else 1
 
-    for index_position in range(50, len(data)):
-        row = data.iloc[index_position]
-        price = safe_float(row["Close"])
-        if price <= 0:
+    for index_position in range(start_index, len(data)):
+        signal_row = data.iloc[index_position - 1]
+        execution_row = data.iloc[index_position]
+        mark_price = safe_float(execution_row.get("Close"))
+        if mark_price <= 0:
             continue
 
-        signal, _score = signal_from_row(row)
-        if index_position - last_trade_index < 7:
+        signal, _score = signal_from_row(signal_row)
+        if index_position - last_trade_index < MIN_TRADE_SPACING_DAYS:
+            continue
+
+        reference_price = trade_price(execution_row, "HOLD")
+        if reference_price <= 0:
+            continue
+
+        portfolio_value = cash + shares * reference_price
+        target_exposure = TARGET_EXPOSURE_BY_SIGNAL.get(signal, TARGET_EXPOSURE_BY_SIGNAL["HOLD"])
+        target_position_value = portfolio_value * target_exposure
+        current_position_value = shares * reference_price
+        rebalance_value = target_position_value - current_position_value
+        if portfolio_value <= 0 or abs(rebalance_value) / portfolio_value < 0.08:
             continue
 
         date_value = data.index[index_position]
         date_label = date_value.date().isoformat() if hasattr(date_value, "date") else str(date_value)
 
-        if signal == "BUY" and cash > 1000:
-            quantity = math.floor((cash * 0.92) / price)
+        if rebalance_value > 0 and cash > 1000:
+            execution_price = trade_price(execution_row, "BUY")
+            max_trade_value = min(rebalance_value, cash * 0.98)
+            quantity = math.floor(max_trade_value / (execution_price * (1 + TRANSACTION_COST_RATE)))
             if quantity <= 0:
                 continue
-            cash -= quantity * price
+            cash -= quantity * execution_price * (1 + TRANSACTION_COST_RATE)
             shares += quantity
             last_trade_index = index_position
             trades.append(
@@ -367,29 +441,33 @@ def simulate_strategy(data: pd.DataFrame) -> Dict[str, Any]:
                     "date": date_label,
                     "action": "BUY",
                     "shares": quantity,
-                    "price": round(price, 2),
-                    "portfolio": round(cash + shares * price, 2),
+                    "price": round(execution_price, 2),
+                    "portfolio": round(cash + shares * mark_price, 2),
                 }
             )
-        elif signal == "SELL" and shares > 0:
-            cash += shares * price
-            sold_shares = shares
-            shares = 0
+        elif rebalance_value < 0 and shares > 0:
+            execution_price = trade_price(execution_row, "SELL")
+            quantity = min(shares, math.floor(abs(rebalance_value) / execution_price))
+            if quantity <= 0:
+                continue
+            cash += quantity * execution_price * (1 - TRANSACTION_COST_RATE)
+            shares -= quantity
             last_trade_index = index_position
             trades.append(
                 {
                     "date": date_label,
                     "action": "SELL",
-                    "shares": sold_shares,
-                    "price": round(price, 2),
-                    "portfolio": round(cash, 2),
+                    "shares": quantity,
+                    "price": round(execution_price, 2),
+                    "portfolio": round(cash + shares * mark_price, 2),
                 }
             )
 
     final_price = safe_float(data["Close"].iloc[-1])
     portfolio_value = cash + shares * final_price
 
-    first_price = safe_float(data["Close"].iloc[0], final_price)
+    first_row = data.iloc[start_index] if len(data) > start_index else data.iloc[0]
+    first_price = safe_float(first_row.get("Open"), safe_float(first_row.get("Close"), final_price))
     buy_hold_shares = initial_cash / first_price if first_price > 0 else 0
     buy_hold_value = buy_hold_shares * final_price
 
@@ -436,7 +514,6 @@ def build_dashboard(symbol: str, risk_profile: str) -> Dict[str, Any]:
     change_percent = (change / previous_price) * 100 if previous_price else 0
     latest_row = data.iloc[-1]
     prediction, model_score = signal_from_row(latest_row)
-    confidence = int(max(52, min(94, 56 + abs(model_score) * 11)))
 
     metrics = {
         "rsi": latest(data["rsi"], 50),
@@ -452,7 +529,8 @@ def build_dashboard(symbol: str, risk_profile: str) -> Dict[str, Any]:
     backtest = simulate_strategy(data)
     accuracy = signal_accuracy(data)
     relative_return = backtest["portfolioReturn"] - backtest["buyHoldReturn"]
-    advisor = recommendation(risk_profile, prediction, confidence, metrics)
+    confidence = evidence_adjusted_confidence(model_score, accuracy, relative_return)
+    advisor = recommendation(risk_profile, prediction, confidence, metrics, accuracy, relative_return)
 
     return {
         "market": {
@@ -468,13 +546,13 @@ def build_dashboard(symbol: str, risk_profile: str) -> Dict[str, Any]:
                 "title": "Model Portfolio Value",
                 "value": money(backtest["portfolioValue"]),
                 "change": percent(backtest["portfolioReturn"]),
-                "updated": "SMA/RSI/MACD strategy",
+                "updated": "next-session execution with costs",
             },
             {
                 "title": "Buy-and-Hold Value",
                 "value": money(backtest["buyHoldValue"]),
                 "change": percent(backtest["buyHoldReturn"]),
-                "updated": f"{stock['symbol']} 1-year baseline",
+                "updated": f"{stock['symbol']} same-window baseline",
             },
             {
                 "title": "ROI vs Hold",
@@ -486,7 +564,7 @@ def build_dashboard(symbol: str, risk_profile: str) -> Dict[str, Any]:
                 "title": "Signal Accuracy",
                 "value": f"{accuracy:.0f}%",
                 "change": f"{confidence}% conf.",
-                "updated": "next-day direction",
+                "updated": "confidence adjusted by evidence",
             },
         ],
         "insights": [
@@ -502,7 +580,7 @@ def build_dashboard(symbol: str, risk_profile: str) -> Dict[str, Any]:
             "confidence": confidence,
             "note": (
                 f"Signal score {model_score:.1f}; price is {percent(((price / metrics['sma50']) - 1) * 100 if metrics['sma50'] else 0)} "
-                "versus the 50-day moving average."
+                "versus the 50-day moving average. Confidence is adjusted for signal accuracy and backtest spread."
             ),
         },
         "advisor": advisor,

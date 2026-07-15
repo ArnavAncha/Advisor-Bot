@@ -444,6 +444,10 @@ select {
   gap: 14px;
 }
 
+.dashboard-bottom-section > * {
+  min-width: 0;
+}
+
 .model-insights ul {
   display: grid;
   gap: 4px;
@@ -507,6 +511,7 @@ select {
 
 .table-wrap {
   width: 100%;
+  max-width: 100%;
   overflow-x: auto;
   border: 1px solid #273142;
   border-radius: 8px;
