@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Search, Sparkles, TrendingUp, ShieldCheck, Bot } from 'lucide-react';
 
-// The main App component that acts as the dashboard
+//dashboard
 const App = () => {
   const [symbol, setSymbol] = useState('NYSE:JPM');
   const [riskProfile, setRiskProfile] = useState('Balanced');
@@ -24,8 +24,7 @@ const App = () => {
   };
 
   return (
-    // This style block contains the CSS you provided, making sure the component
-    // is styled correctly.
+
     <>
       <style>
         {`
@@ -198,7 +197,8 @@ const App = () => {
           gap: 24px;
           margin-bottom: 32px;
         }
-        
+        .3
+
         .kpi-cards .card {
           text-align: left;
           background-color: #1e293b;
