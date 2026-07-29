@@ -1,0 +1,117 @@
+import java.util.Scanner;
+
+public class RoboAdvisor {
+
+    public static void main(String[] args) {
+
+        Scanner input = new Scanner(System.in);
+
+        System.out.println("===================================");
+        System.out.println("      Welcome to AdvisorBot");
+        System.out.println("===================================");
+
+        System.out.print("What is your name? ");
+        String name = input.nextLine();
+
+        System.out.print("How old are you? ");
+        int age = input.nextInt();
+
+        System.out.print("How much would you like to invest ($)? ");
+        double amount = input.nextDouble();
+
+        int score = 0;
+
+        // Investment Goal
+        System.out.println("\nWhat is your investment goal?");
+        System.out.println("1. Emergency Fund");
+        System.out.println("2. College");
+        System.out.println("3. Retirement");
+        System.out.println("4. General Wealth");
+        int goal = input.nextInt();
+
+        if(goal == 4)
+            score += 2;
+        else if(goal == 3)
+            score += 1;
+
+        // Investment Timeline
+        System.out.println("\nHow long will you keep your money invested?");
+        System.out.println("1. Less than 1 year");
+        System.out.println("2. 1-3 years");
+        System.out.println("3. 3-5 years");
+        System.out.println("4. 5-10 years");
+        System.out.println("5. More than 10 years");
+        int timeline = input.nextInt();
+
+        score += timeline - 1;
+
+        // Market Drop
+        System.out.println("\nIf your investments dropped by 20%, what would you do?");
+        System.out.println("1. Sell everything");
+        System.out.println("2. Sell some");
+        System.out.println("3. Wait");
+        System.out.println("4. Buy more");
+        int reaction = input.nextInt();
+
+        score += reaction;
+
+        // Experience
+        System.out.println("\nHow much investing experience do you have?");
+        System.out.println("1. None");
+        System.out.println("2. Beginner");
+        System.out.println("3. Intermediate");
+        System.out.println("4. Advanced");
+        int experience = input.nextInt();
+
+        score += experience;
+
+        // Risk Tolerance
+        System.out.println("\nRisk Tolerance");
+        System.out.println("1. Very Low");
+        System.out.println("2. Low");
+        System.out.println("3. Moderate");
+        System.out.println("4. High");
+        System.out.println("5. Very High");
+        int risk = input.nextInt();
+
+        score += risk;
+
+        System.out.println("\n===================================");
+        System.out.println("Investment Recommendation");
+        System.out.println("===================================");
+
+        System.out.println("Name: " + name);
+        System.out.println("Age: " + age);
+        System.out.printf("Investment Amount: $%.2f%n", amount);
+
+        if(score <= 10){
+            System.out.println("\nPortfolio Type: CONSERVATIVE");
+            System.out.println("70% Bonds");
+            System.out.println("20% Index Funds");
+            System.out.println("10% Cash");
+            System.out.println("\nReason:");
+            System.out.println("You prefer lower risk and protecting your money.");
+        }
+        else if(score <= 16){
+            System.out.println("\nPortfolio Type: BALANCED");
+            System.out.println("60% Index Funds");
+            System.out.println("30% Bonds");
+            System.out.println("10% Real Estate ETF");
+            System.out.println("\nReason:");
+            System.out.println("You are comfortable with moderate risk for steady growth.");
+        }
+        else{
+            System.out.println("\nPortfolio Type: AGGRESSIVE");
+            System.out.println("80% Stock Index Funds");
+            System.out.println("10% International ETFs");
+            System.out.println("10% Bonds");
+            System.out.println("\nReason:");
+            System.out.println("You have a long investment horizon and can tolerate higher risk for potentially greater returns.");
+        }
+
+        System.out.println("\nDisclaimer:");
+        System.out.println("This recommendation is for educational purposes only and is not professional financial advice.");
+
+        input.close();
+    }
+}
